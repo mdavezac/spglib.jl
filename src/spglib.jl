@@ -27,9 +27,8 @@ function symmetry_operations(lattice::AbstractMatrix,
   end
   const maxsize::Integer = 52
   rotations = Array{Cint}((3, 3, maxsize))
-  rotations[:] = 0
   translations = Array{Cdouble}((3, maxsize))
-  translations[:] = 0
+
   unique_types = unique(types)
   type_indices = Cint[findfirst(unique_types, u) for u in types]
   clattice = convert(Matrix{Cdouble}, lattice)
@@ -47,5 +46,53 @@ function symmetry_operations(lattice::AbstractMatrix,
   [AffineTransform(transpose(rotations[:, :, i]), translations[:, i]) for i in 1:numops]
 end
 
-export symmetry_operations
+function international_symbol(lattice::AbstractMatrix,
+                              positions::AbstractMatrix,
+                              types::AbstractVector;
+                              symprec::Real=1e-8)
+  result = zeros(Cchar, 11)
+
+  unique_types = unique(types)
+  type_indices = Cint[findfirst(unique_types, u) for u in types]
+  clattice = convert(Matrix{Cdouble}, lattice)
+  cpositions = convert(Matrix{Cdouble}, positions)
+  numops = ccall(
+      (:spg_get_international, spglib),
+      Cint,
+      (Ptr{Cchar}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cint},
+       Cint, Cdouble),
+    result, clattice, cpositions, type_indices, length(type_indices), symprec
+  )
+
+  if numops == 0
+    error("Could not determine internation symbol")
+  end
+  join(convert(Array{Char}, result[1:findfirst(result, 0) - 1]))
+end
+
+function schoenflies_symbol(lattice::AbstractMatrix,
+                           positions::AbstractMatrix,
+                           types::AbstractVector;
+                           symprec::Real=1e-8)
+  result = zeros(Cchar, 11)
+
+  unique_types = unique(types)
+  type_indices = Cint[findfirst(unique_types, u) for u in types]
+  clattice = convert(Matrix{Cdouble}, lattice)
+  cpositions = convert(Matrix{Cdouble}, positions)
+  numops = ccall(
+      (:spg_get_schoenflies, spglib),
+      Cint,
+      (Ptr{Cchar}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cint},
+       Cint, Cdouble),
+    result, clattice, cpositions, type_indices, length(type_indices), symprec
+  )
+
+  if numops == 0
+    error("Could not determine Schoenflies symbol")
+  end
+  join(convert(Array{Char}, result[1:findfirst(result, 0) - 1]))
+end
+
+export symmetry_operations, international_symbol, schoenflies_symbol
 end # module
